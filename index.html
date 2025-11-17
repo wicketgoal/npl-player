@@ -3,15 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Universal Link Viewer</title>
+
+<title>Universal Player</title>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.4.0"></script>
 
 <style>
     html, body {
         margin: 0;
         height: 100%;
         background: #000;
-        font-family: Arial, sans-serif;
         overflow: hidden;
+        font-family: Arial, sans-serif;
     }
 
     #videoPlayer, #iframeViewer {
@@ -19,9 +22,29 @@
         height: 100%;
         display: none;
         border: none;
-        background: black;
+        background: #000;
     }
 
+    /* Loader Spinner */
+    #loader {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        border: 6px solid rgba(255,255,255,0.2);
+        border-top: 6px solid #fff;
+        border-radius: 50%;
+        width: 45px;
+        height: 45px;
+        animation: spin 0.9s linear infinite;
+        z-index: 20;
+    }
+
+    @keyframes spin {
+        100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    /* Watermark */
     #overlay-text {
         position: absolute;
         bottom: 5%;
@@ -29,23 +52,29 @@
         transform: translateX(-50%);
         color: rgba(255, 255, 255, 0.7);
         font-size: 18px;
+        z-index: 15;
         pointer-events: none;
-        z-index: 10;
     }
 </style>
 </head>
 <body>
 
+<div id="loader"></div>
+
 <video id="videoPlayer" controls autoplay playsinline></video>
+
+<!-- IMPORTANT: no sandbox (same as old working code) -->
 <iframe id="iframeViewer"></iframe>
+
 <div id="overlay-text">WicketGoal.com</div>
 
 <script>
     const streams = {
         "1": "https://example.com/video.mp4",
         "2": "https://mugi-aafai-garna.kasin-tv.com/hi/play.php?id=137948",
-        "3": "https://example.com/image.jpg",
-        "4": "https://example.com/"
+        "3": "https://example.com/somepage.html",
+        "4": "https://example.com/",
+        "5": "https://example.com/image.jpg"
     };
 
     const params = new URLSearchParams(window.location.search);
@@ -54,20 +83,55 @@
 
     const video = document.getElementById("videoPlayer");
     const iframe = document.getElementById("iframeViewer");
+    const loader = document.getElementById("loader");
 
-    // Check if URL is a video format
-    const videoExtensions = ["mp4", "webm", "ogg", "mov", "mkv"];
-    const isVideo = videoExtensions.some(ext => url.toLowerCase().includes("." + ext));
+    function hideLoader() {
+        loader.style.display = "none";
+    }
 
-    if (isVideo) {
-        // Play video
-        video.src = url;
+    // ----- DETECT TYPE -----
+    const isHLS = url.endsWith(".m3u8") || url.includes("playlist.m3u8");
+    const videoExt = ["mp4", "webm", "ogg", "mov", "mkv"];
+    const isVideo = videoExt.some(ext => url.toLowerCase().includes("." + ext));
+
+    if (isHLS) {
+        // ----- HLS VIDEO -----
         video.style.display = "block";
-        video.addEventListener("loadeddata", () => video.play());
+
+        if (Hls.isSupported()) {
+            const hls = new Hls();
+            hls.loadSource(url);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                video.play();
+                hideLoader();
+            });
+            hls.on(Hls.Events.ERROR, () => hideLoader());
+        } else {
+            // Safari fallback
+            video.src = url;
+            video.addEventListener("loadedmetadata", () => {
+                video.play();
+                hideLoader();
+            });
+        }
+
+    } else if (isVideo) {
+        // ----- NORMAL VIDEO FILE -----
+        video.style.display = "block";
+        video.src = url;
+
+        video.addEventListener("loadeddata", hideLoader);
+
     } else {
-        // Load in iframe
-        iframe.src = url;
+        // ----- IFRAME (ALL OTHER LINKS) -----
         iframe.style.display = "block";
+        iframe.src = url;
+
+        // Hide loader when iframe finishes loading
+        iframe.onload = () => {
+            hideLoader();
+        };
     }
 </script>
 
