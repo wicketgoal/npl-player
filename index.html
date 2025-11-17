@@ -3,15 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Universal Link Viewer</title>
+
+<title>Universal Player</title>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.4.0"></script>
 
 <style>
     html, body {
         margin: 0;
         height: 100%;
         background: #000;
-        font-family: Arial, sans-serif;
         overflow: hidden;
+        font-family: Arial, sans-serif;
     }
 
     #videoPlayer, #iframeViewer {
@@ -19,9 +22,29 @@
         height: 100%;
         display: none;
         border: none;
-        background: black;
+        background: #000;
     }
 
+    /* Loading Spinner */
+    #loader {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        border: 6px solid rgba(255,255,255,0.2);
+        border-top: 6px solid #fff;
+        border-radius: 50%;
+        width: 45px;
+        height: 45px;
+        animation: spin 0.9s linear infinite;
+        z-index: 20;
+    }
+
+    @keyframes spin {
+        100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    /* Watermark */
     #overlay-text {
         position: absolute;
         bottom: 5%;
@@ -29,23 +52,43 @@
         transform: translateX(-50%);
         color: rgba(255, 255, 255, 0.7);
         font-size: 18px;
+        z-index: 15;
         pointer-events: none;
-        z-index: 10;
+    }
+
+    /* Fallback Message */
+    #errorMessage {
+        color: white;
+        text-align: center;
+        font-size: 20px;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        display: none;
+        width: 80%;
     }
 </style>
 </head>
 <body>
 
+<div id="loader"></div>
+
 <video id="videoPlayer" controls autoplay playsinline></video>
-<iframe id="iframeViewer"></iframe>
+
+<iframe id="iframeViewer" sandbox="allow-same-origin allow-scripts allow-forms"></iframe>
+
 <div id="overlay-text">WicketGoal.com</div>
+
+<div id="errorMessage">This content cannot be loaded due to website restrictions.</div>
 
 <script>
     const streams = {
-        "1": "https://mugi-aafai-garna.kasin-tv.com/hi/play.php?id=137948",
-        "2": "https://example.com/live.html",
-        "3": "https://example.com/image.jpg",
-        "4": "https://example.com/"
+        "1": "https://example.com/video.mp4",
+        "2": "https://example.com/live.m3u8",
+        "3": "https://example.com/somepage.html",
+        "4": "https://example.com/",
+        "5": "https://example.com/image.jpg"
     };
 
     const params = new URLSearchParams(window.location.search);
@@ -54,20 +97,67 @@
 
     const video = document.getElementById("videoPlayer");
     const iframe = document.getElementById("iframeViewer");
+    const loader = document.getElementById("loader");
+    const errorBox = document.getElementById("errorMessage");
 
-    // Check if URL is a video format
-    const videoExtensions = ["mp4", "webm", "ogg", "mov", "mkv"];
-    const isVideo = videoExtensions.some(ext => url.toLowerCase().includes("." + ext));
+    // ----- DETECT FILE TYPE -----
+    const isHLS = url.endsWith(".m3u8") || url.includes("playlist.m3u8");
+    const videoExt = ["mp4", "webm", "ogg", "mov", "mkv"];
+    const isVideo = videoExt.some(ext => url.toLowerCase().includes("." + ext));
 
-    if (isVideo) {
-        // Play video
-        video.src = url;
+    function hideLoader() {
+        loader.style.display = "none";
+    }
+
+    if (isHLS) {
+        // ----- HLS PLAYER -----
         video.style.display = "block";
-        video.addEventListener("loadeddata", () => video.play());
+
+        if (Hls.isSupported()) {
+            const hls = new Hls();
+            hls.loadSource(url);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                video.play();
+                hideLoader();
+            });
+            hls.on(Hls.Events.ERROR, () => hideLoader());
+        } else {
+            // Safari fallback
+            video.src = url;
+            video.addEventListener("loadedmetadata", () => {
+                video.play();
+                hideLoader();
+            });
+        }
+
+    } else if (isVideo) {
+        // ----- NORMAL VIDEO -----
+        video.style.display = "block";
+        video.src = url;
+
+        video.addEventListener("loadeddata", hideLoader);
+        video.addEventListener("error", () => {
+            hideLoader();
+            errorBox.style.display = "block";
+        });
+
     } else {
-        // Load in iframe
-        iframe.src = url;
+        // ----- IFRAME -----
         iframe.style.display = "block";
+        iframe.src = url;
+
+        // Check if iframe blocks loading
+        let iframeTimeout = setTimeout(() => {
+            loader.style.display = "none";
+            errorBox.style.display = "block";
+            iframe.style.display = "none";
+        }, 6000);
+
+        iframe.onload = () => {
+            clearTimeout(iframeTimeout);
+            hideLoader();
+        };
     }
 </script>
 
