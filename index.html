@@ -3,104 +3,136 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Universal Stream Player</title>
+
+<title>Universal Player</title>
 
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.4.0"></script>
 
 <style>
     html, body {
         margin: 0;
-        padding: 0;
-        width: 100%;
         height: 100%;
         background: #000;
         overflow: hidden;
+        font-family: Arial, sans-serif;
     }
 
     #videoPlayer, #iframeViewer {
         width: 100%;
         height: 100%;
-        background: #000;
-        border: none;
         display: none;
+        border: none;
+        background: #000;
     }
 
+    /* Loader Spinner */
+    #loader {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        border: 6px solid rgba(255,255,255,0.2);
+        border-top: 6px solid #fff;
+        border-radius: 50%;
+        width: 45px;
+        height: 45px;
+        animation: spin 0.9s linear infinite;
+        z-index: 20;
+    }
+
+    @keyframes spin {
+        100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    /* Watermark */
     #overlay-text {
         position: absolute;
         bottom: 5%;
         left: 50%;
         transform: translateX(-50%);
-        color: rgba(255,255,255,0.7);
+        color: rgba(255, 255, 255, 0.7);
         font-size: 18px;
-        z-index: 10;
+        z-index: 15;
         pointer-events: none;
     }
 </style>
 </head>
 <body>
 
-<video id="videoPlayer" autoplay muted playsinline></video>
-<iframe id="iframeViewer" allowfullscreen></iframe>
+<div id="loader"></div>
+
+<video id="videoPlayer" controls autoplay playsinline></video>
+
+<!-- IMPORTANT: no sandbox (same as old working code) -->
+<iframe id="iframeViewer"></iframe>
+
 <div id="overlay-text">WicketGoal.com</div>
 
 <script>
-const streams = {
-    "1": "https://ktvhdsg.ekantipur.com:8443/ktvmax2025/match1/playlist.m3u8", // HLS
-    "2": "http://fuck-you.kasin-tv.com/fc/play.php?id=138296", // iframe stream
-    "3": "http://fuck-you.kasin-tv.com/fc/play.php?id=138296",
-    "4": "https://player.kick.com/wicketgoal?autoplay=true",
-    "5": "https://trovo.live/s/2aa5b2f8e1e5ff58e01ff7819/234276596?adtag=user.2aa5b2f8e1e5ff58e01ff7819.clip"
-};
+    const streams = {
+        "1": "https://ktvhdsg.ekantipur.com:8443/ktvmax2025/match1/playlist.m3u8",
+        "2": "http://fuck-you.kasin-tv.com/fc/play.php?id=138296",
+        "3": "https://mugi-aafai-garna.kasin-tv.com/hi/play.php?id=138295",
+        "4": "https://player.kick.com/wicketgoal?autoplay=true",
+        "5": "https://trovo.live/s/2aa5b2f8e1e5ff58e01ff7819/234276596?adtag=user.2aa5b2f8e1e5ff58e01ff7819.clip"
+    };
 
-const params = new URLSearchParams(window.location.search);
-const id = params.get("id") || "1";
-const url = streams[id] || streams["1"];
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("id") || "1";
+    const url = streams[id] || streams["1"];
 
-const video = document.getElementById('videoPlayer');
-const iframe = document.getElementById('iframeViewer');
+    const video = document.getElementById("videoPlayer");
+    const iframe = document.getElementById("iframeViewer");
+    const loader = document.getElementById("loader");
 
-const hlsExt = ['.m3u8'];
-const videoExt = ['.mp4', '.webm', '.ogg', '.mov', '.mkv'];
-
-// Check type
-function isHLS(url) { return hlsExt.some(ext => url.toLowerCase().includes(ext)); }
-function isVideo(url) { return videoExt.some(ext => url.toLowerCase().includes(ext)); }
-
-function requestFullscreen(el) {
-    if (el.requestFullscreen) el.requestFullscreen();
-    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
-    else if (el.msRequestFullscreen) el.msRequestFullscreen();
-}
-
-if (isHLS(url)) {
-    // HLS stream
-    video.style.display = 'block';
-    if (Hls.isSupported()) {
-        const hls = new Hls();
-        hls.loadSource(url);
-        hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            video.play();
-            requestFullscreen(video);
-        });
-    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = url;
-        video.addEventListener('loadedmetadata', () => {
-            video.play();
-            requestFullscreen(video);
-        });
+    function hideLoader() {
+        loader.style.display = "none";
     }
-} else if (isVideo(url)) {
-    // Normal video
-    video.style.display = 'block';
-    video.src = url;
-    video.play();
-    requestFullscreen(video);
-} else {
-    // Iframe (Kick, Trovo, kasin-tv)
-    iframe.style.display = 'block';
-    iframe.src = url;
-}
+
+    // ----- DETECT TYPE -----
+    const isHLS = url.endsWith(".m3u8") || url.includes("playlist.m3u8");
+    const videoExt = ["mp4", "webm", "ogg", "mov", "mkv"];
+    const isVideo = videoExt.some(ext => url.toLowerCase().includes("." + ext));
+
+    if (isHLS) {
+        // ----- HLS VIDEO -----
+        video.style.display = "block";
+
+        if (Hls.isSupported()) {
+            const hls = new Hls();
+            hls.loadSource(url);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                video.play();
+                hideLoader();
+            });
+            hls.on(Hls.Events.ERROR, () => hideLoader());
+        } else {
+            // Safari fallback
+            video.src = url;
+            video.addEventListener("loadedmetadata", () => {
+                video.play();
+                hideLoader();
+            });
+        }
+
+    } else if (isVideo) {
+        // ----- NORMAL VIDEO FILE -----
+        video.style.display = "block";
+        video.src = url;
+
+        video.addEventListener("loadeddata", hideLoader);
+
+    } else {
+        // ----- IFRAME (ALL OTHER LINKS) -----
+        iframe.style.display = "block";
+        iframe.src = url;
+
+        // Hide loader when iframe finishes loading
+        iframe.onload = () => {
+            hideLoader();
+        };
+    }
 </script>
 
 </body>
