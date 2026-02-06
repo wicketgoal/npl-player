@@ -67,6 +67,9 @@ html, body {
 <div id="overlay-text"></div>
 
 <script>
+
+  const PROXY = "https://proxy.dailylivescoress.workers.dev/?url=";
+
 const streams = {
   wl: "https://playztv-apps.pages.dev/willow/index.m3u8",
   ss: "https://playztv-apps.pages.dev/star-sports/index.m3u8",
@@ -95,7 +98,7 @@ else if (url.includes(".m3u8")) {
 
   if (Hls.isSupported()) {
     const hls = new Hls({ lowLatencyMode: true });
-    hls.loadSource(url);
+   hls.loadSource(PROXY + encodeURIComponent(url));
     hls.attachMedia(video);
 
     hls.on(Hls.Events.LEVEL_LOADED, hideLoader);
