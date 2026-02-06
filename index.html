@@ -3,9 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HLS Player for Blogger</title>
-
-<script src="https://cdn.jsdelivr.net/npm/hls.js@1.4.0"></script>
+<title>Website Embed Player</title>
 
 <style>
 html, body {
@@ -17,10 +15,10 @@ html, body {
   font-family: Arial, sans-serif;
 }
 
-#videoPlayer {
+#iframeViewer {
   width: 100%;
   height: 100%;
-  background: #000;
+  border: none;
 }
 
 #loader {
@@ -46,55 +44,33 @@ html, body {
 <body>
 
 <div id="loader"></div>
-<video id="videoPlayer" controls autoplay muted playsinline></video>
+<iframe id="iframeViewer" allow="autoplay; fullscreen" allowfullscreen></iframe>
 
 <script>
-// --- Free/Public HLS streams ---
+// --- Websites to embed ---
 const streams = {
-  "1": "https://playztv-apps.pages.dev/tsports/index.m3u8",
-  "2": "https://playerhls.com/tv/video-player.php?url=https://playztv-apps.pages.dev/tsports/index.m3u8",
-  "sample3": "https://test-streams.mux.dev/test_001/stream.m3u8"
+  "1": "https://playerhls.com/tv/video-player.php?url=https://playztv-apps.pages.dev/tsports/index.m3u8",
+  "site2": "https://playerhls.com/?url=https://www.w3schools.com/html/mov_bbb.mp4",
+  "site3": "https://www.example.com"
 };
 
-// Get the stream ID from URL (e.g., ?id=sample1)
+// Get stream ID from URL (?id=site1)
 const params = new URLSearchParams(window.location.search);
-const id = params.get("id") || "sample1";
+const id = params.get("id") || "site1";
 const url = streams[id];
 
-const video = document.getElementById("videoPlayer");
+const iframe = document.getElementById("iframeViewer");
 const loader = document.getElementById("loader");
 
-function hideLoader() {
-  loader.style.display = "none";
-}
-
 if (!url) {
-  loader.innerHTML = "Invalid Stream";
+  loader.innerHTML = "Invalid URL";
 } else {
-  // --- Native HLS (Safari / iOS) ---
-  if (video.canPlayType("application/vnd.apple.mpegurl")) {
-    video.src = url;
-    video.addEventListener("loadedmetadata", () => {
-      video.play().catch(()=>{});
-      hideLoader();
-    });
-  } 
-  // --- Hls.js for Chrome/Android ---
-  else if (Hls.isSupported()) {
-    const hls = new Hls({ lowLatencyMode: true });
-    hls.loadSource(url);
-    hls.attachMedia(video);
-    hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      video.play().catch(()=>{});
-      hideLoader();
-    });
-    hls.on(Hls.Events.ERROR, () => {
-      loader.innerHTML = "Stream Error";
-    });
-  } 
-  else {
-    loader.innerHTML = "Your browser does not support HLS";
-  }
+  iframe.src = url;
+
+  // Hide loader once iframe loads
+  iframe.onload = () => {
+    loader.style.display = "none";
+  };
 }
 </script>
 
