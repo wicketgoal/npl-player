@@ -96,18 +96,31 @@ if (!url) {
 else if (url.includes(".m3u8")) {
   video.style.display = "block";
 
-  if (Hls.isSupported()) {
-    const hls = new Hls({ lowLatencyMode: true });
-   hls.loadSource(PROXY + encodeURIComponent(url));
+  // ✅ Native HLS first (Safari / iOS)
+  if (video.canPlayType("application/vnd.apple.mpegurl")) {
+    video.src = url;
+    video.addEventListener("loadedmetadata", () => {
+      video.play().catch(()=>{});
+      hideLoader();
+    });
+  }
+  // ✅ HLS.js via Cloudflare Worker (Chrome / Android)
+  else if (Hls.isSupported()) {
+    const hls = new Hls({
+      lowLatencyMode: true,
+      enableWorker: false
+    });
+
+    hls.loadSource(PROXY + encodeURIComponent(url));
     hls.attachMedia(video);
 
     hls.on(Hls.Events.LEVEL_LOADED, hideLoader);
-    hls.on(Hls.Events.ERROR, hideLoader);
-  } else {
-    video.src = url;
-    video.addEventListener("loadedmetadata", hideLoader);
+    hls.on(Hls.Events.ERROR, () => {
+      loader.innerHTML = "Stream unavailable";
+    });
   }
-} 
+}
+
 else {
   iframe.style.display = "block";
   iframe.src = url;
